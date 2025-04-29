@@ -7,9 +7,6 @@ import org.springframework.web.client.RestTemplate;
 import ru.hpclab.hl.module2.dto.BookingDto;
 import ru.hpclab.hl.module2.dto.HotelRoomDto;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
 @Component
 public class Client {
 
@@ -25,8 +22,6 @@ public class Client {
     @Value("${roomSource}")
     private String roomSource;
 
-    private final Map<Long, HotelRoomDto> roomCache = new ConcurrentHashMap<>();
-
     public RestTemplate restTemplate(int connectionTimeout, int readTimeout) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(connectionTimeout);
@@ -40,14 +35,6 @@ public class Client {
     }
 
     public HotelRoomDto getRoom(Long id) {
-        HotelRoomDto cachedRoom = roomCache.get(id);
-        if (cachedRoom != null) {
-            return cachedRoom;
-        }
-        HotelRoomDto room = this.restTemplate(60000, 60000).getForObject(String.format("http://%s:%d/%s/%d", baseUrl, port, roomSource, id), HotelRoomDto.class);
-        if (room != null) {
-            roomCache.put(id, room);
-        }
-        return room;
+        return this.restTemplate(60000, 60000).getForObject(String.format("http://%s:%d/%s/%d", baseUrl, port, roomSource, id), HotelRoomDto.class);
     }
 }

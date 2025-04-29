@@ -1,11 +1,9 @@
 package ru.hpclab.hl.module2.service;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.EnableScheduling;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import ru.hpclab.hl.module2.cache.RoomCache;
 import ru.hpclab.hl.module2.client.Client;
 import ru.hpclab.hl.module2.dto.BookingDto;
 import ru.hpclab.hl.module2.dto.HotelRoomDto;
@@ -28,19 +26,13 @@ public class AnalyticsService {
     @Autowired
     private Client client;
 
-    private static final Logger logger = LogManager.getLogger(AnalyticsService.class);
-
-    private final Map<Long, RoomType> roomTypeMap = new HashMap<>();
-
-    @Scheduled(fixedDelayString = "${cacheStatsInterval}")
-    public void scheduleFixedDelayTask() {
-        logger.info("Cache size is {}", roomTypeMap.size());
-    }
+    @Autowired
+    private RoomCache cache;
 
     public Map<String, Map<RoomType, Double>> getStat() {
         BookingDto[] getBookingsResponse = client.getBookings();
-
         Map<YearMonth, Map<RoomType, List<Long>>> occupancyByMonthAndType = new HashMap<>();
+        Map<Long, RoomType> roomTypeMap = new HashMap<>();
 
         assert getBookingsResponse != null;
         for (BookingDto booking : getBookingsResponse) {
@@ -49,7 +41,15 @@ public class AnalyticsService {
             LocalDate endDate = booking.getDateLeave().toInstant().atZone(ZoneId.systemDefault())
                     .toLocalDate();
 
-            HotelRoomDto bookedRoom = client.getRoom(booking.getRoomId());
+            HotelRoomDto cachedRoom = cache.roomCacheMap.get(booking.getRoomId());
+            HotelRoomDto bookedRoom;
+            if (cachedRoom == null) {
+                bookedRoom = client.getRoom(booking.getRoomId());
+                cache.roomCacheMap.put(bookedRoom.getId(), bookedRoom);
+            } else {
+                bookedRoom = cachedRoom;
+            }
+
             RoomType roomType = bookedRoom.getType();
             if (roomType == null) continue;
             else {
