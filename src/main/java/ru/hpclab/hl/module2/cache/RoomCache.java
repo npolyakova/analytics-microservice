@@ -13,9 +13,13 @@ import java.util.Map;
 @Component
 public class RoomCache {
 
-    public Map<Long, HotelRoomDto> roomCacheMap = new HashMap<>();
+    private Map<Long, HotelRoomDto> roomCacheMap = new HashMap<>();
 
     private static final Logger logger = LogManager.getLogger(AnalyticsService.class);
+
+    public Map<Long, HotelRoomDto> getRoomCache() {
+        return roomCacheMap;
+    }
 
     @Scheduled(fixedDelayString = "${cacheStatsInterval}")
     public void scheduleFixedDelayTask() {

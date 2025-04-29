@@ -41,11 +41,11 @@ public class AnalyticsService {
             LocalDate endDate = booking.getDateLeave().toInstant().atZone(ZoneId.systemDefault())
                     .toLocalDate();
 
-            HotelRoomDto cachedRoom = cache.roomCacheMap.get(booking.getRoomId());
+            HotelRoomDto cachedRoom = cache.getRoomCache().get(booking.getRoomId());
             HotelRoomDto bookedRoom;
             if (cachedRoom == null) {
                 bookedRoom = client.getRoom(booking.getRoomId());
-                cache.roomCacheMap.put(bookedRoom.getId(), bookedRoom);
+                cache.getRoomCache().put(bookedRoom.getId(), bookedRoom);
             } else {
                 bookedRoom = cachedRoom;
             }
