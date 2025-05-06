@@ -1,5 +1,6 @@
 package ru.hpclab.hl.module2.client;
 
+import io.github.resilience4j.retry.annotation.Retry;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
@@ -30,10 +31,12 @@ public class Client {
         return new RestTemplate(factory);
     }
 
+    @Retry(name = "ANALYTIC_SERVICE")
     public BookingDto[] getBookings() {
         return this.restTemplate(120000, 120000).getForObject(String.format("http://%s:%d/%s", baseUrl, port, bookingSource), BookingDto[].class);
     }
 
+    @Retry(name = "ANALYTIC_SERVICE")
     public HotelRoomDto getRoom(Long id) {
         return this.restTemplate(60000, 60000).getForObject(String.format("http://%s:%d/%s/%d", baseUrl, port, roomSource, id), HotelRoomDto.class);
     }

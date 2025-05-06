@@ -3,7 +3,6 @@ package ru.hpclab.hl.module2.service;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 import ru.hpclab.hl.module2.cache.RoomCache;
 import ru.hpclab.hl.module2.client.Client;
 import ru.hpclab.hl.module2.dto.BookingDto;
@@ -30,25 +29,26 @@ public class AnalyticsService {
     @Autowired
     private Client client;
 
-//    @Autowired
-//    private RoomCache cache;
+    @Autowired
+    private RoomCache roomCache;
 
     @Autowired
     private ObservabilityService observabilityService;
 
-    final String baseUrl = "http://192.168.1.62:8080/api";
-    final String bookingSource = "/bookings";
-    final String roomSource = "/rooms";
+    private HotelRoomDto getRoomById(Long id) {
+        if (!roomCache.getRoomCache().containsKey(id)) {
+            var room = client.getRoom(id);
+
+            roomCache.getRoomCache().put(room.getId(), room);
+
+            return room;
+        }
+
+        return roomCache.getRoomCache().get(id);
+    }
 
     public Map<String, Map<RoomType, Double>> getStat() {
-        RestTemplate restTemplate = new RestTemplate();
-
-        HotelRoomDto[] getRoomsResponse = restTemplate.getForObject(baseUrl + roomSource, HotelRoomDto[].class);
-        BookingDto[] getBookingsResponse = restTemplate.getForObject(baseUrl + bookingSource, BookingDto[].class);
-
-        assert getRoomsResponse != null;
-        Map<Long, RoomType> roomTypeMap = Arrays.stream(getRoomsResponse)
-                .collect(Collectors.toMap(HotelRoomDto::getId, HotelRoomDto::getType));
+        BookingDto[] getBookingsResponse = client.getBookings();
 
         Map<YearMonth, Map<RoomType, List<Long>>> occupancyByMonthAndType = new HashMap<>();
 
@@ -58,7 +58,7 @@ public class AnalyticsService {
             LocalDate endDate = booking.getDateLeave().toInstant().atZone(ZoneId.systemDefault())
                     .toLocalDate();
 
-            RoomType roomType = roomTypeMap.get(booking.getRoomId());
+            RoomType roomType = getRoomById(booking.getRoomId()).getType();
             if (roomType == null) continue;
 
             startDate.datesUntil(endDate.plusDays(1)).forEach(date -> {
@@ -72,7 +72,7 @@ public class AnalyticsService {
 
         Map<String, Map<RoomType, Double>> result = new TreeMap<>();
 
-        Set<RoomType> roomTypes = Arrays.stream(getRoomsResponse)
+        Set<RoomType> roomTypes = Arrays.stream((HotelRoomDto[]) roomCache.getRoomCache().values().toArray())
                 .map(HotelRoomDto::getType)
                 .collect(Collectors.toSet());
 
@@ -82,7 +82,7 @@ public class AnalyticsService {
             roomTypes.forEach(type -> {
                 List<Long> occupiedRoomsOfType = typeCounts.getOrDefault(type, Collections.emptyList());
                 long uniqueOccupiedRooms = occupiedRoomsOfType.stream().distinct().count();
-                long totalRoomsOfType = Arrays.stream(getRoomsResponse)
+                long totalRoomsOfType = Arrays.stream((HotelRoomDto[]) roomCache.getRoomCache().values().toArray())
                         .filter(r -> r.getType().equals(type))
                         .count();
 
