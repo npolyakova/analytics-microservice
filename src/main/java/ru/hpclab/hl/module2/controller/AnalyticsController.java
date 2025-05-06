@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import ru.hpclab.hl.module2.dto.RoomType;
 import ru.hpclab.hl.module2.service.AnalyticsService;
+import ru.hpclab.hl.module2.service.ObservabilityService;
 
 import java.util.Map;
 
@@ -16,13 +17,15 @@ public class AnalyticsController {
     @Autowired
     AnalyticsService analyticsService;
 
-    public AnalyticsController(AnalyticsService analyticsService){
-        this.analyticsService = analyticsService;
-    }
+    @Autowired
+    private ObservabilityService observabilityService;
 
     @GetMapping("")
     public Map<String, Map<RoomType, Double>> getStatistics(){
-        return analyticsService.getStat();
+        observabilityService.start();
+        Map<String, Map<RoomType, Double>> stat = analyticsService.getStat();
+        observabilityService.stop();
+        return stat;
     }
 
 }

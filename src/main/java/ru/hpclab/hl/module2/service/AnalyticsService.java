@@ -3,6 +3,7 @@ package ru.hpclab.hl.module2.service;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 import ru.hpclab.hl.module2.cache.RoomCache;
 import ru.hpclab.hl.module2.client.Client;
 import ru.hpclab.hl.module2.dto.BookingDto;
@@ -13,48 +14,52 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.stream.Collectors;
 
 @Service
 @EnableScheduling
 public class AnalyticsService {
+
     @Autowired
     private Client client;
 
+//    @Autowired
+//    private RoomCache cache;
+
     @Autowired
-    private RoomCache cache;
+    private ObservabilityService observabilityService;
+
+    final String baseUrl = "http://192.168.1.62:8080/api";
+    final String bookingSource = "/bookings";
+    final String roomSource = "/rooms";
 
     public Map<String, Map<RoomType, Double>> getStat() {
-        BookingDto[] getBookingsResponse = client.getBookings();
-        Map<YearMonth, Map<RoomType, List<Long>>> occupancyByMonthAndType = new HashMap<>();
-        Map<Long, RoomType> roomTypeMap = new HashMap<>();
+        RestTemplate restTemplate = new RestTemplate();
 
-        assert getBookingsResponse != null;
+        HotelRoomDto[] getRoomsResponse = restTemplate.getForObject(baseUrl + roomSource, HotelRoomDto[].class);
+        BookingDto[] getBookingsResponse = restTemplate.getForObject(baseUrl + bookingSource, BookingDto[].class);
+
+        assert getRoomsResponse != null;
+        Map<Long, RoomType> roomTypeMap = Arrays.stream(getRoomsResponse)
+                .collect(Collectors.toMap(HotelRoomDto::getId, HotelRoomDto::getType));
+
+        Map<YearMonth, Map<RoomType, List<Long>>> occupancyByMonthAndType = new HashMap<>();
+
         for (BookingDto booking : getBookingsResponse) {
             LocalDate startDate = booking.getDateArr().toInstant().atZone(ZoneId.systemDefault())
                     .toLocalDate();
             LocalDate endDate = booking.getDateLeave().toInstant().atZone(ZoneId.systemDefault())
                     .toLocalDate();
 
-            HotelRoomDto cachedRoom = cache.getRoomCache().get(booking.getRoomId());
-            HotelRoomDto bookedRoom;
-            if (cachedRoom == null) {
-                bookedRoom = client.getRoom(booking.getRoomId());
-                cache.getRoomCache().put(bookedRoom.getId(), bookedRoom);
-            } else {
-                bookedRoom = cachedRoom;
-            }
-
-            RoomType roomType = bookedRoom.getType();
+            RoomType roomType = roomTypeMap.get(booking.getRoomId());
             if (roomType == null) continue;
-            else {
-                roomTypeMap.put(bookedRoom.getId(), bookedRoom.getType());
-            }
 
             startDate.datesUntil(endDate.plusDays(1)).forEach(date -> {
                 YearMonth yearMonth = YearMonth.from(date);
@@ -67,7 +72,9 @@ public class AnalyticsService {
 
         Map<String, Map<RoomType, Double>> result = new TreeMap<>();
 
-        Set<RoomType> roomTypes = Set.of(RoomType.LUX, RoomType.ECONOM, RoomType.STANDART);
+        Set<RoomType> roomTypes = Arrays.stream(getRoomsResponse)
+                .map(HotelRoomDto::getType)
+                .collect(Collectors.toSet());
 
         occupancyByMonthAndType.forEach((yearMonth, typeCounts) -> {
             String monthKey = yearMonth.toString();
@@ -75,8 +82,8 @@ public class AnalyticsService {
             roomTypes.forEach(type -> {
                 List<Long> occupiedRoomsOfType = typeCounts.getOrDefault(type, Collections.emptyList());
                 long uniqueOccupiedRooms = occupiedRoomsOfType.stream().distinct().count();
-                long totalRoomsOfType = roomTypeMap.values().stream()
-                        .filter(r -> r.equals(type))
+                long totalRoomsOfType = Arrays.stream(getRoomsResponse)
+                        .filter(r -> r.getType().equals(type))
                         .count();
 
                 double occupancyRate = totalRoomsOfType == 0 ? 0 :
