@@ -72,7 +72,7 @@ public class AnalyticsService {
 
         Map<String, Map<RoomType, Double>> result = new TreeMap<>();
 
-        Set<RoomType> roomTypes = Arrays.stream((HotelRoomDto[]) roomCache.getRoomCache().values().toArray())
+        Set<RoomType> roomTypes = roomCache.getRoomCache().values().stream()
                 .map(HotelRoomDto::getType)
                 .collect(Collectors.toSet());
 
@@ -82,7 +82,7 @@ public class AnalyticsService {
             roomTypes.forEach(type -> {
                 List<Long> occupiedRoomsOfType = typeCounts.getOrDefault(type, Collections.emptyList());
                 long uniqueOccupiedRooms = occupiedRoomsOfType.stream().distinct().count();
-                long totalRoomsOfType = Arrays.stream((HotelRoomDto[]) roomCache.getRoomCache().values().toArray())
+                long totalRoomsOfType = roomCache.getRoomCache().values().stream()
                         .filter(r -> r.getType().equals(type))
                         .count();
 

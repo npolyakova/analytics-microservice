@@ -4,7 +4,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import ru.hpclab.hl.module1.client.KillerClient;
+import ru.hpclab.hl.module2.client.KillerClient;
+
 
 @Component
 @RequiredArgsConstructor
